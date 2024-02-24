@@ -58,4 +58,23 @@ contract LinearBondingCurveTokenTest is Test {
         // 75 + (10 * 10 - 5 * 5) / 4
         assertEq(address(bob).balance, 93.75 ether);
     }
+
+    function test_CannotMintAndBurnAtSameBlock() public {
+        address bob = makeAddr("bob");
+        vm.deal(bob, 10 ether);
+
+        vm.startPrank(bob);
+        token.mint{value: 0.25 ether}(bob, 1 ether);
+        assertEq(token.balanceOf(bob), 1 ether);
+
+        vm.expectRevert("same account cannot mint and burn at the same block");
+        token.burn(0.1 ether);
+
+        vm.roll(100);
+        token.burn(1 ether);
+        assertEq(token.balanceOf(bob), 0 ether);
+
+        vm.expectRevert("same account cannot mint and burn at the same block");
+        token.mint{value: 0.25 ether}(bob, 1 ether);
+    }
 }

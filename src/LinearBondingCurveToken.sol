@@ -15,7 +15,8 @@ contract LinearBondingCurveToken is ERC20, Ownable2Step {
     uint8 public immutable I_COEFFICIENT;
     uint8 public constant PERCENT = 100;
     uint256 public constant MIN_AMOUNT = 0.1 ether;
-    mapping(uint256 => mapping(address => bool)) private accountByBlock;
+    mapping(uint256 => mapping(address => bool)) private mintingAccountByBlock;
+    mapping(uint256 => mapping(address => bool)) private burningAccountByBlock;
 
     constructor(string memory _name, string memory _symbol, uint8 _c) ERC20(_name, _symbol) {
         require(_c > 0, "must be greater than 0");
@@ -27,10 +28,11 @@ contract LinearBondingCurveToken is ERC20, Ownable2Step {
     /// @param _to the address to which new tokens will be sent
     /// @param _amount the amount of tokens to mint
     function mint(address _to, uint256 _amount) external payable {
+        require(!burningAccountByBlock[block.number][_msgSender()], "same account cannot mint and burn at the same block");
         require(_amount >= MIN_AMOUNT, "must mint at least MIN_AMOUNT");
         uint256 expectedEther = calculatePayment(_amount);
         require(msg.value >= expectedEther, "not enough ether");
-        accountByBlock[block.number][_to] = true;
+        mintingAccountByBlock[block.number][_msgSender()] = true;
 
         _mint(_to, _amount);
     }
@@ -40,8 +42,9 @@ contract LinearBondingCurveToken is ERC20, Ownable2Step {
     /// @param _amount the amount of tokens to burn
     function burn(uint256 _amount) external {
         require(_amount >= MIN_AMOUNT, "must burn at least MIN_AMOUNT");
-        require(!accountByBlock[block.number][_msgSender()], "same account cannot mint and burn at the same block");
+        require(!mintingAccountByBlock[block.number][_msgSender()], "same account cannot mint and burn at the same block");
 
+        burningAccountByBlock[block.number][_msgSender()] = true;
         _burn(_msgSender(), _amount);
 
         uint256 payment = calculatePayment(_amount);
@@ -53,8 +56,9 @@ contract LinearBondingCurveToken is ERC20, Ownable2Step {
     /// @param _account the owner of tokens which will be burnt
     /// @param _amount the amount of tokens to burn
     function burnFrom(address _account, uint256 _amount) external {
-        require(!accountByBlock[block.number][_account], "same account cannot mint and burn at the same block");
+        require(!mintingAccountByBlock[block.number][_account], "same account cannot mint and burn at the same block");
 
+        burningAccountByBlock[block.number][_account] = true;
         _spendAllowance(_account, _msgSender(), _amount);
         _burn(_account, _amount);
 
