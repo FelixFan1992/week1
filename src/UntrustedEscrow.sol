@@ -17,6 +17,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // 4. how to safely withdraw all the matured timelock transfers
 // 5. how to skip all the failed ones
 // 6. how to handle fee-on tokens / rebasing tokens
+// 7. protect against re-entrancy attack
 // solution:
 // 1. transfer tokens from senders to escrow service (note: escrow address needs to be approved first)
 // 2. deploy a timelock contract to manage a transfer
@@ -24,6 +25,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // 4. use a mapping from beneficiary to an index to the timelocks array.
 // 5. implement a wrapper to catch revert and return false?
 // 6. overcharge 3-5% and refund to sender after releasing the funds to receivers?
+// 7. timelock contract makes sure funds are not mingled together
 contract UntrustedEscrow is Ownable2Step {
     using SafeERC20 for IERC20;
 
@@ -57,8 +59,17 @@ contract UntrustedEscrow is Ownable2Step {
     }
 
     /// @notice retrieves all the time lock contracts for the msg sender
-    function getAllTimeLocks() external returns (TokenTimelock[] memory) {
+    function getAllTimeLocks() external view returns (TokenTimelock[] memory) {
         return ttls[_msgSender()];
+    }
+
+    /// @notice release the funds in idx-th timelock contract to the beneficiary
+    /// @param idx The index
+    function withdrawFor(uint256 idx) external {
+        TokenTimelock[] memory locks = ttls[_msgSender()];
+        require(locks.length > idx, "incorrect index");
+
+        locks[idx].release();
     }
 
     /// @notice release the funds in timelock contract to the beneficiary

@@ -36,6 +36,24 @@ contract UntrustedEscrowTest is Test {
         escrow.deposit(token1, alice, 2 ether);
     }
 
+    function test_WithdrawFor() public {
+        vm.startPrank(bob);
+        token1.mint(bob, 10 ether);
+        token1.approve(address(escrow), 2 ether);
+        escrow.deposit(token1, alice, 2 ether);
+
+        vm.warp(block.timestamp + 3 days);
+        vm.startPrank(alice);
+        vm.expectRevert("incorrect index");
+        escrow.withdrawFor(1);
+
+        escrow.withdrawFor(0);
+        assertEq(token1.balanceOf(alice), 2 ether);
+
+        vm.expectRevert("TokenTimelock: no tokens to release");
+        escrow.withdrawFor(0);
+    }
+
     function test_Withdraw() public {
         vm.startPrank(bob);
         token1.mint(bob, 10 ether);
